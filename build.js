@@ -6,8 +6,8 @@ if (!key) {
   process.exit(1);
 }
 
-let html = fs.readFileSync('aeroeq_dashboard.html', 'utf8');
+let html = fs.readFileSync('index.html', 'utf8');
 html = html.replace('%%FINNHUB_API_KEY%%', key);
-fs.writeFileSync('aeroeq_dashboard.html', html);
+fs.writeFileSync('index.html', html);
 
 console.log('✓ Finnhub API key injected successfully.');
