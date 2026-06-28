@@ -1,0 +1,1021 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>AeroEq Dashboard | AFM 241</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='16' fill='%23060e1e'/><circle cx='16' cy='16' r='15' fill='none' stroke='%23c9a84c' stroke-width='1.5'/><text x='16' y='22' text-anchor='middle' font-size='17' font-weight='900' fill='%23c9a84c' font-family='Arial,sans-serif'>A</text></svg>"/>
+  <style>
+    :root {
+      --bg:      #060e1e;
+      --surf:    #0c1a30;
+      --border:  rgba(255,255,255,0.07);
+      --bgold:   rgba(201,168,76,0.30);
+      --text1:   #dce8ff;
+      --text2:   #6a80a8;
+      --gold:    #c9a84c;
+      --gold-lt: #f0cb6e;
+      --green:   #00d68f;
+      --amber:   #f59e0b;
+      --red:     #ff4d6d;
+      --shadow:  0 4px 24px rgba(0,0,0,0.5);
+    }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+    body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+         background:var(--bg);color:var(--text1);min-height:100vh;font-size:14px;}
+
+    /* ── KEY BANNER (shown only when no saved key) ───────── */
+    #keyBanner{
+      background:rgba(201,168,76,.08);border-bottom:1px solid var(--bgold);
+      padding:10px 36px;display:flex;align-items:center;gap:12px;
+      flex-wrap:wrap;
+    }
+    #keyBanner.hidden{display:none;}
+    .kb-label{font-size:.65rem;font-weight:700;color:var(--gold);
+              text-transform:uppercase;letter-spacing:1px;white-space:nowrap;}
+    .kb-input{
+      flex:1;min-width:220px;max-width:360px;
+      background:rgba(255,255,255,.04);border:1px solid var(--border);
+      border-radius:6px;padding:7px 12px;color:var(--text1);
+      font-size:.82rem;font-family:inherit;outline:none;transition:border-color .18s;
+    }
+    .kb-input:focus{border-color:var(--bgold);}
+    .kb-btn{
+      padding:7px 18px;background:linear-gradient(135deg,rgba(201,168,76,.2),rgba(201,168,76,.1));
+      border:1px solid var(--bgold);color:var(--gold-lt);border-radius:6px;
+      font-size:.78rem;font-weight:700;cursor:pointer;white-space:nowrap;
+      transition:background .18s;
+    }
+    .kb-btn:hover{background:linear-gradient(135deg,rgba(201,168,76,.32),rgba(201,168,76,.18));}
+    .kb-hint{font-size:.65rem;color:var(--text2);}
+    .kb-hint a{color:var(--gold);text-decoration:none;}
+    .kb-hint a:hover{text-decoration:underline;}
+    .kb-err{font-size:.65rem;color:var(--red);display:none;}
+
+    /* ── APP ──────────────────────────────────────────────── */
+    #app{display:block;}
+
+    /* ── HEADER ───────────────────────────────────────────── */
+    header{
+      background:linear-gradient(135deg,#060e1e 0%,#0d1e38 55%,#0f2346 100%);
+      border-bottom:1px solid var(--bgold);
+      padding:16px 36px;
+      display:flex;align-items:center;
+      position:relative;overflow:hidden;
+    }
+    header::before{content:"";position:absolute;inset:0;
+      background:repeating-linear-gradient(90deg,transparent,transparent 80px,
+        rgba(201,168,76,.025) 80px,rgba(201,168,76,.025) 81px);pointer-events:none;}
+    header::after{content:"";position:absolute;bottom:0;left:0;right:0;height:1px;
+      background:linear-gradient(90deg,transparent,var(--gold) 30%,var(--gold-lt) 50%,var(--gold) 70%,transparent);
+      opacity:.5;}
+
+    .hdr-brand{position:relative;z-index:1;}
+    .hdr-fund{
+      font-size:1.5rem;font-weight:800;letter-spacing:-.5px;
+      background:linear-gradient(90deg,var(--gold-lt),var(--gold),#a87c2a);
+      -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+    }
+    .hdr-dash{font-size:.62rem;font-weight:600;color:var(--text2);
+              text-transform:uppercase;letter-spacing:2.5px;margin-top:3px;}
+
+    .hdr-sep{width:1px;height:38px;
+             background:linear-gradient(to bottom,transparent,var(--bgold),transparent);
+             margin:0 26px;flex-shrink:0;}
+
+    .hdr-meta{display:flex;align-items:center;gap:22px;position:relative;z-index:1;}
+    .hdr-sl{font-size:.57rem;font-weight:700;text-transform:uppercase;
+            letter-spacing:1px;color:var(--text2);margin-bottom:2px;}
+    .hdr-sv{font-size:.8rem;font-weight:600;color:var(--text1);}
+
+    .hdr-right{margin-left:auto;display:flex;align-items:center;
+               gap:14px;position:relative;z-index:1;}
+
+    /* Market status badge — state classes applied via JS */
+    .mkt-badge{
+      display:flex;align-items:center;gap:7px;
+      border:1px solid;padding:5px 13px;border-radius:20px;
+      transition:all .3s;
+    }
+    .mkt-badge.open  {background:rgba(0,214,143,.07); border-color:rgba(0,214,143,.25);}
+    .mkt-badge.pre   {background:rgba(245,158,11,.07); border-color:rgba(245,158,11,.25);}
+    .mkt-badge.post  {background:rgba(245,158,11,.07); border-color:rgba(245,158,11,.25);}
+    .mkt-badge.closed{background:rgba(255,77,109,.06); border-color:rgba(255,77,109,.20);}
+
+    .mkt-dot{width:7px;height:7px;border-radius:50%;}
+    .mkt-badge.open   .mkt-dot{background:var(--green);box-shadow:0 0 8px rgba(0,214,143,.6);
+                                animation:pulse 2s ease-in-out infinite;}
+    .mkt-badge.pre    .mkt-dot{background:var(--amber);}
+    .mkt-badge.post   .mkt-dot{background:var(--amber);}
+    .mkt-badge.closed .mkt-dot{background:var(--red);}
+    @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.35;}}
+
+    .mkt-label{font-size:.63rem;font-weight:700;letter-spacing:.8px;}
+    .mkt-badge.open   .mkt-label{color:var(--green);}
+    .mkt-badge.pre    .mkt-label{color:var(--amber);}
+    .mkt-badge.post   .mkt-label{color:var(--amber);}
+    .mkt-badge.closed .mkt-label{color:var(--red);}
+
+    /* Refresh / countdown block */
+    .refresh-block{text-align:right;}
+    .countdown{font-size:.65rem;color:var(--text2);margin-bottom:4px;min-height:14px;}
+    .refresh-btn{
+      background:rgba(201,168,76,.10);border:1px solid var(--bgold);
+      color:var(--gold-lt);padding:6px 14px;border-radius:6px;
+      font-size:.73rem;font-weight:700;cursor:pointer;letter-spacing:.3px;
+      transition:background .18s;white-space:nowrap;
+    }
+    .refresh-btn:hover{background:rgba(201,168,76,.2);border-color:var(--gold);}
+    .refresh-btn:disabled{opacity:.4;cursor:default;}
+
+    .hdr-clock{text-align:right;}
+    .clock-t{font-size:1.05rem;font-weight:700;font-variant-numeric:tabular-nums;
+             color:var(--text1);letter-spacing:.5px;}
+    .clock-d{font-size:.6rem;color:var(--text2);margin-top:1px;}
+
+    /* ── MAIN ─────────────────────────────────────────────── */
+    main{max-width:1400px;margin:0 auto;padding:24px 32px 48px;}
+
+    /* ── MANDATE STRIP ────────────────────────────────────── */
+    .mandate-strip{
+      display:flex;align-items:center;flex-wrap:wrap;
+      background:rgba(0,214,143,.035);border:1px solid rgba(0,214,143,.12);
+      border-radius:8px;padding:9px 18px;margin-bottom:20px;font-size:.7rem;
+    }
+    .mi{display:flex;align-items:center;gap:5px;white-space:nowrap;
+        padding:2px 16px;border-right:1px solid rgba(255,255,255,.05);}
+    .mi:first-child{padding-left:0;}
+    .mi:last-child{border-right:none;}
+    .mi-chk{color:var(--green);font-weight:700;}
+    .mi-l{color:var(--text2);}
+    .mi-v{color:var(--text1);font-weight:600;margin-left:3px;}
+
+    /* ── CARDS ────────────────────────────────────────────── */
+    .cards{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px;}
+    .card{
+      background:var(--surf);border:1px solid var(--border);
+      border-top:1px solid var(--bgold);border-radius:12px;
+      padding:18px 20px;box-shadow:var(--shadow);position:relative;overflow:hidden;
+    }
+    .card::before{content:"";position:absolute;inset:0;
+      background:linear-gradient(135deg,rgba(201,168,76,.05) 0%,transparent 60%);pointer-events:none;}
+    .card.accent{border-top-color:var(--gold);}
+    .card.accent::before{background:linear-gradient(135deg,rgba(201,168,76,.10) 0%,transparent 60%);}
+    .card-lbl{font-size:.6rem;font-weight:700;color:var(--text2);
+              text-transform:uppercase;letter-spacing:1px;margin-bottom:7px;}
+    .card-val{font-size:1.42rem;font-weight:800;color:var(--text1);
+              line-height:1.15;letter-spacing:-.5px;}
+    .card-sub{font-size:.72rem;margin-top:4px;color:var(--text2);}
+    .pos{color:var(--green)!important;}
+    .neg{color:var(--red)!important;}
+
+    /* ── GRID ─────────────────────────────────────────────── */
+    .content-grid{display:grid;grid-template-columns:1fr 336px;gap:20px;align-items:start;}
+
+    /* ── PANEL ────────────────────────────────────────────── */
+    .panel{background:var(--surf);border:1px solid var(--border);
+           border-radius:12px;padding:20px 22px;box-shadow:var(--shadow);}
+    .panel-title{font-size:.62rem;font-weight:700;color:var(--gold);
+                 text-transform:uppercase;letter-spacing:1.2px;
+                 padding-bottom:11px;border-bottom:1px solid var(--bgold);margin-bottom:14px;}
+
+    /* ── TABLE ────────────────────────────────────────────── */
+    .tbl-wrap{overflow-x:auto;}
+    table{width:100%;border-collapse:collapse;white-space:nowrap;}
+    thead th{font-size:.59rem;font-weight:700;color:var(--text2);text-transform:uppercase;
+             letter-spacing:.8px;padding:6px 10px;text-align:right;
+             border-bottom:1px solid var(--border);}
+    thead th.l{text-align:left;}
+
+    .data-row{cursor:pointer;transition:background .12s;}
+    .data-row:hover td,.data-row.open td{background:rgba(201,168,76,.04);}
+    .data-row td{padding:11px 10px;border-bottom:1px solid var(--border);
+                 text-align:right;vertical-align:middle;}
+    .data-row td.l{text-align:left;}
+
+    .td-chev{color:var(--text2);font-size:.75rem;
+             transition:transform .2s;display:inline-block;margin-right:4px;}
+    .data-row.open .td-chev{transform:rotate(90deg);}
+    .td-ticker{font-weight:800;font-size:.88rem;color:var(--gold-lt);}
+    .td-name{color:var(--text2);font-size:.78rem;}
+
+    .sec-tag{font-size:.63rem;color:var(--text2);
+             background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.07);
+             border-radius:4px;padding:2px 6px;display:inline-block;}
+    .slv-tag{font-size:.6rem;font-weight:700;border-radius:4px;
+             padding:2px 6px;display:inline-block;letter-spacing:.3px;}
+    .slv-g{background:rgba(59,130,246,.14);color:#60a5fa;border:1px solid rgba(59,130,246,.2);}
+    .slv-d{background:rgba(16,185,129,.12);color:#34d399;border:1px solid rgba(16,185,129,.2);}
+
+    .price-wrap{display:inline-flex;align-items:center;gap:5px;justify-content:flex-end;}
+    .dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
+    .dot-g{background:var(--green);box-shadow:0 0 6px rgba(0,214,143,.55);}
+    .dot-r{background:var(--red);  box-shadow:0 0 6px rgba(255,77,109,.55);}
+    .stale-tag{font-size:.57rem;font-weight:700;color:var(--red);
+               background:rgba(255,77,109,.1);border:1px solid rgba(255,77,109,.2);
+               padding:1px 5px;border-radius:3px;}
+
+    .ret-pos{color:var(--green);font-weight:700;}
+    .ret-neg{color:var(--red);  font-weight:700;}
+
+    /* expand row */
+    .exp-row{display:none;}
+    .exp-row.open{display:table-row;}
+    .exp-row td{padding:0!important;border-bottom:1px solid var(--bgold);}
+    .exp-inner{
+      padding:14px 18px 16px;
+      background:linear-gradient(135deg,rgba(201,168,76,.04),rgba(6,14,30,.5));
+      display:grid;grid-template-columns:180px 1fr;gap:20px;
+      border-left:2px solid var(--gold);
+    }
+    .exp-sl{font-size:.57rem;font-weight:700;color:var(--text2);
+            text-transform:uppercase;letter-spacing:1px;margin-bottom:5px;}
+    .rec-badge{font-size:.63rem;font-weight:800;padding:3px 9px;border-radius:4px;
+               letter-spacing:.5px;display:inline-block;margin-bottom:8px;}
+    .rec-buy  {background:rgba(0,214,143,.14);color:var(--green);border:1px solid rgba(0,214,143,.22);}
+    .rec-watch{background:rgba(245,158,11,.12);color:var(--amber);border:1px solid rgba(245,158,11,.2);}
+    .score-n{font-size:.8rem;font-weight:700;color:var(--text1);}
+    .score-d{font-size:.7rem;color:var(--text2);}
+    .em{margin-bottom:5px;}
+    .em-l{font-size:.63rem;color:var(--text2);}
+    .em-v{font-size:.8rem;font-weight:700;color:var(--text1);}
+    .exp-bullets{list-style:none;padding:0;}
+    .exp-bullets li{font-size:.74rem;color:var(--text2);padding:3px 0;line-height:1.5;}
+    .exp-bullets li::before{content:"›";color:var(--gold);margin-right:7px;font-weight:700;}
+
+    /* loading */
+    .loading-row td{text-align:center;padding:36px;color:var(--text2);}
+    .spinner{display:inline-block;width:13px;height:13px;
+             border:2px solid var(--border);border-top-color:var(--gold);
+             border-radius:50%;animation:spin .7s linear infinite;
+             vertical-align:middle;margin-right:7px;}
+    @keyframes spin{to{transform:rotate(360deg);}}
+
+    /* price key */
+    .price-key{display:flex;gap:18px;flex-wrap:wrap;margin-top:12px;
+               padding-top:11px;border-top:1px solid var(--border);align-items:center;}
+    .ki{display:flex;align-items:center;gap:5px;font-size:.68rem;color:var(--text2);}
+    .ts-info{margin-left:auto;font-size:.65rem;color:var(--text2);}
+    .ts-info span{color:var(--text1);}
+
+    /* ── CHART ────────────────────────────────────────────── */
+    #pieCanvas{display:block;margin:0 auto 16px;cursor:default;}
+    .leg-row{display:flex;align-items:center;justify-content:space-between;
+             padding:6px 0;border-bottom:1px solid var(--border);font-size:.77rem;
+             transition:opacity .15s,background .15s;border-radius:4px;padding-left:4px;padding-right:4px;}
+    .leg-row:last-child{border-bottom:none;}
+    .leg-row.dim{opacity:.35;}
+    .leg-row.hi {background:rgba(255,255,255,.04);opacity:1;}
+    .leg-l{display:flex;align-items:center;gap:7px;}
+    .leg-sw{width:9px;height:9px;border-radius:50%;flex-shrink:0;
+            transition:transform .15s;box-shadow:0 0 0 0 transparent;}
+    .leg-row.hi .leg-sw{transform:scale(1.4);box-shadow:0 0 6px rgba(255,255,255,.3);}
+    .leg-nm{color:var(--text1);font-weight:500;}
+    .leg-usd{font-size:.67rem;color:var(--text2);margin-left:2px;}
+    .leg-pct{font-weight:800;color:var(--gold-lt);font-size:.8rem;}
+
+    /* ── RETURN BARS ──────────────────────────────────────── */
+    .ret-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-top:20px;}
+    .rb-card{background:var(--surf);border:1px solid var(--border);
+             border-radius:10px;padding:13px 15px;box-shadow:var(--shadow);}
+    .rb-tk{font-size:.75rem;font-weight:800;color:var(--gold-lt);margin-bottom:1px;}
+    .rb-sc{font-size:.58rem;color:var(--text2);margin-bottom:9px;}
+    .rb-track{height:5px;background:rgba(255,255,255,.07);border-radius:3px;overflow:hidden;margin-bottom:6px;}
+    .rb-fill{height:100%;border-radius:3px;transition:width .6s ease;}
+    .rb-pos{background:linear-gradient(90deg,#00d68f,#00b377);}
+    .rb-neg{background:linear-gradient(90deg,#ff4d6d,#cc3d58);}
+    .rb-pct{font-size:.77rem;font-weight:800;}
+    .rb-usd{font-size:.63rem;color:var(--text2);margin-top:2px;}
+
+    /* ── FOOTER ───────────────────────────────────────────── */
+    footer{text-align:center;font-size:.68rem;color:var(--text2);
+           padding:16px 32px 26px;border-top:1px solid var(--border);}
+    footer em{color:var(--gold);opacity:.5;font-style:normal;}
+
+    /* ── RESPONSIVE ───────────────────────────────────────── */
+    @media(max-width:1100px){.content-grid{grid-template-columns:1fr;}
+      .ret-grid{grid-template-columns:repeat(3,1fr);}}
+    @media(max-width:720px){.cards{grid-template-columns:repeat(2,1fr);}
+      header{flex-wrap:wrap;gap:12px;padding:14px 18px;}
+      .hdr-sep,.hdr-meta{display:none;}
+      .ret-grid{grid-template-columns:repeat(2,1fr);}}
+    @media(max-width:440px){.cards{grid-template-columns:1fr;}}
+  </style>
+</head>
+<body>
+
+<!-- ══ APP ══════════════════════════════════════════════════════════ -->
+<div id="app">
+
+  <!-- KEY BANNER — hidden once a key is saved -->
+  <div id="keyBanner">
+    <span class="kb-label">Finnhub API Key</span>
+    <input id="kb-input" class="kb-input" type="text"
+           placeholder="Paste your key here…" autocomplete="off" spellcheck="false"
+           onkeydown="if(event.key==='Enter') saveKey()"/>
+    <button class="kb-btn" onclick="saveKey()">Connect</button>
+    <span class="kb-hint">Free key at <a href="https://finnhub.io" target="_blank">finnhub.io</a> · no credit card</span>
+    <span class="kb-err" id="kb-err">Key required.</span>
+  </div>
+
+  <!-- HEADER -->
+  <header>
+    <div class="hdr-brand">
+      <div class="hdr-fund">AeroEq Fund</div>
+      <div class="hdr-dash">AeroEq Dashboard</div>
+    </div>
+    <div class="hdr-sep"></div>
+    <div class="hdr-meta">
+      <div><div class="hdr-sl">Strategy</div><div class="hdr-sv">Balanced Growth / Defensive</div></div>
+      <div><div class="hdr-sl">AUM</div><div class="hdr-sv">$1,000,000</div></div>
+      <div><div class="hdr-sl">Holdings</div><div class="hdr-sv">6 + Cash</div></div>
+      <div><div class="hdr-sl">Inception</div><div class="hdr-sv">Jun 25, 2026</div></div>
+    </div>
+    <div class="hdr-right">
+      <!-- Market status badge — class toggled by JS -->
+      <div class="mkt-badge closed" id="mktBadge">
+        <span class="mkt-dot"></span>
+        <span class="mkt-label" id="mktLabel">CHECKING…</span>
+      </div>
+
+      <div class="hdr-clock">
+        <div class="clock-t" id="clockT">--:--:--</div>
+        <div class="clock-d" id="clockD"></div>
+      </div>
+
+      <div class="refresh-block">
+        <div class="countdown" id="countdown"></div>
+        <button class="refresh-btn" id="refreshBtn" onclick="fetchAll(true)">&#8635; Refresh</button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+
+    <!-- MANDATE STRIP -->
+    <div class="mandate-strip">
+      <div class="mi"><span class="mi-chk">✓</span><span class="mi-l">Holdings</span><span class="mi-v">6 of 5–8</span></div>
+      <div class="mi"><span class="mi-chk">✓</span><span class="mi-l">Sectors</span><span class="mi-v">4 (Fin · Tech · Staples · Health)</span></div>
+      <div class="mi"><span class="mi-chk">✓</span><span class="mi-l">Cash</span><span class="mi-v">8.12% of NAV</span></div>
+      <div class="mi"><span class="mi-chk">✓</span><span class="mi-l">Max Position</span><span class="mi-v">PG at 18.0%</span></div>
+      <div class="mi"><span class="mi-chk">✓</span><span class="mi-l">Exchange</span><span class="mi-v">NYSE / Nasdaq only</span></div>
+      <div class="mi"><span class="mi-chk">✓</span><span class="mi-l">Universe</span><span class="mi-v">All 6 confirmed</span></div>
+    </div>
+
+    <!-- SUMMARY CARDS -->
+    <div class="cards">
+      <div class="card accent">
+        <div class="card-lbl">Total Portfolio Value</div>
+        <div class="card-val" id="cTotal">—</div>
+        <div class="card-sub">Equities + Cash</div>
+      </div>
+      <div class="card">
+        <div class="card-lbl">Total Cost Basis</div>
+        <div class="card-val" id="cCost">—</div>
+        <div class="card-sub">Capital deployed</div>
+      </div>
+      <div class="card">
+        <div class="card-lbl">Total Return</div>
+        <div class="card-val" id="cRet">—</div>
+        <div class="card-sub" id="cRetPct">—</div>
+      </div>
+      <div class="card">
+        <div class="card-lbl">Cash Position</div>
+        <div class="card-val">$81,233</div>
+        <div class="card-sub">8.12% of NAV</div>
+      </div>
+    </div>
+
+    <!-- HOLDINGS + CHART -->
+    <div class="content-grid">
+
+      <div class="panel">
+        <div class="panel-title">Portfolio Holdings &nbsp;·&nbsp; Click any row to expand position rationale</div>
+        <div class="tbl-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th class="l" style="width:24px;"></th>
+                <th class="l">Ticker</th>
+                <th class="l">Company</th>
+                <th class="l">Sector</th>
+                <th class="l">Sleeve</th>
+                <th>Shares</th>
+                <th>Cost Basis</th>
+                <th>Live Price</th>
+                <th>Total Value</th>
+                <th>Weight</th>
+                <th>Return ($)</th>
+                <th>Return (%)</th>
+              </tr>
+            </thead>
+            <tbody id="tbody">
+              <tr class="loading-row">
+                <td colspan="12"><span class="spinner"></span>Loading prices from Finnhub…</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="price-key">
+          <div class="ki"><span class="dot dot-g"></span>Live — Finnhub</div>
+          <div class="ki"><span class="dot dot-r"></span>Stale — fetch failed</div>
+          <div class="ts-info">Updated: <span id="tsVal">—</span></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">Sector Allocation</div>
+        <canvas id="pieCanvas" width="292" height="292"></canvas>
+        <div id="legend"></div>
+      </div>
+
+    </div>
+
+    <!-- RETURN BARS -->
+    <div class="panel" style="margin-top:20px;">
+      <div class="panel-title">Position Returns — Since Inception (Jun 25, 2026)</div>
+      <div class="ret-grid" id="retBars">
+        <!-- skeleton cards shown until prices load -->
+        <div class="rb-card rb-skel" style="opacity:.35;grid-column:1/-1;text-align:center;
+             font-size:.72rem;color:var(--text2);padding:18px;">
+          <span class="spinner"></span> Awaiting prices…
+        </div>
+      </div>
+      <div id="staleBanner" style="display:none;margin-top:10px;font-size:.7rem;
+           color:var(--amber);background:rgba(245,158,11,.07);border:1px solid rgba(245,158,11,.2);
+           border-radius:6px;padding:8px 14px;">
+        ⚠ Prices loaded as stale — returns show $0 because live price = cost basis.
+        Check that your Finnhub API key is valid and try refreshing.
+      </div>
+    </div>
+
+  </main>
+
+  <footer>
+    AeroEq Fund &bull; AFM 241 Investment Dashboard &bull;
+    <em>Prices via Finnhub &bull; Auto-refreshes every 60 s when market is open</em>
+    &bull; <span id="discBtn" onclick="toggleDisc()"
+      style="cursor:pointer;color:var(--gold);font-style:normal;text-decoration:underline dotted;">
+      Disclaimer &#9660;</span>
+    &bull; <span onclick="changeKey()"
+      style="cursor:pointer;color:var(--text2);font-style:normal;text-decoration:underline dotted;font-size:.65rem;">
+      change API key</span>
+
+    <div id="discBody" style="display:none;margin-top:10px;padding:12px 18px;
+         background:rgba(255,255,255,.03);border:1px solid var(--border);
+         border-radius:8px;text-align:left;font-size:.74rem;line-height:1.7;
+         color:var(--text2);max-width:720px;margin-left:auto;margin-right:auto;">
+      <strong style="color:var(--text1);">Simulated Portfolio — Not Financial Advice.</strong>
+      This is a course project for AFM 241 at the University of Waterloo. All holdings are hypothetical
+      and do not represent actual trades or real capital. Live prices are sourced from Finnhub and may
+      be delayed or inaccurate. Nothing on this dashboard constitutes investment advice, a solicitation,
+      or a recommendation to buy or sell any security.
+    </div>
+  </footer>
+</div>
+
+<!-- ══ SCRIPT ════════════════════════════════════════════════════════ -->
+<script>
+/* ── Portfolio data ──────────────────────────────────────────── */
+const HOLDINGS = [
+  {
+    ticker:'JPM',  name:'JPMorgan Chase',   sector:'Financials',       sleeve:'Growth',
+    shares:417,  cost:335.12,
+    rec:'BUY', score:'4.5',
+    bullets:['$50B buyback Jul 1 + dividend raised 10% to $1.65/qtr — largest capital return in JPM history',
+             'NIM tailwind: higher-for-longer rates structurally lift net interest income',
+             'P/E 16.0x — discount to S&P 500 (~22x) with 15.7% FCF yield and fortress balance sheet'],
+    metrics:[['P/E TTM','16.0x'],['FCF Yield','15.7%'],['Dividend','1.76%']]
+  },
+  {
+    ticker:'COST', name:'Costco Wholesale', sector:'Consumer Staples', sleeve:'Defensive',
+    shares:148,  cost:942.24,
+    rec:'WATCH', score:'3.9',
+    bullets:['May 2026 comp sales +12.5% YoY — value-seeking behavior confirmed in slow-growth environment',
+             'Net cash balance sheet (Net Debt/EBITDA –0.74x); interest coverage 76.9x — zero financial risk',
+             'WATCH: 47.3x P/E is the binding constraint — exceptional business at a premium multiple'],
+    metrics:[['P/E TTM','47.3x'],['ROE','28.3%'],['Dividend','0.57%']]
+  },
+  {
+    ticker:'MSFT', name:'Microsoft',        sector:'Technology',       sleeve:'Growth',
+    shares:425,  cost:352.83,
+    rec:'BUY', score:'4.5',
+    bullets:['Azure +29% YoY; commercial RPO $627B (+99%) — ~2.5 years of revenue already contracted',
+             'EV/EBITDA 13.2x — below S&P 500 average while compounding revenue at 15% CAGR',
+             'Near 52-week low ($352 vs $555 peak) — rare quality-at-value entry point'],
+    metrics:[['EV/EBITDA','13.2x'],['Gross Margin','68.3%'],['Net Margin','39.3%']]
+  },
+  {
+    ticker:'V',    name:'Visa Inc.',        sector:'Financials',       sleeve:'Growth',
+    shares:393,  cost:330.52,
+    rec:'BUY', score:'4.4',
+    bullets:['Q2 FY2026: revenue +17%, adj net profit +16.5% — growth accelerating, not decelerating',
+             '81.3% gross margin and 51.7% net margin — best earnings quality in the portfolio',
+             'OpenAI partnership positions Visa as infrastructure for agentic AI commerce flows'],
+    metrics:[['Gross Margin','81.3%'],['Net Margin','51.7%'],['P/E TTM','28.8x']]
+  },
+  {
+    ticker:'PG',   name:'Procter & Gamble', sector:'Consumer Staples', sleeve:'Defensive',
+    shares:1212, cost:148.50,
+    rec:'BUY', score:'4.0',
+    bullets:['65+ consecutive years of dividend increases — Dividend King at 2.93% confirmed yield',
+             'Q3 FY2026: revenue +7%, full-year guidance maintained — pricing power in slow-growth environment',
+             'Largest defensive position (18% NAV) providing ballast against growth sleeve drawdowns'],
+    metrics:[['Dividend Yield','2.93%'],['NTM P/E','~24x'],['Rev Growth (Q3)','7%']]
+  },
+  {
+    ticker:'JNJ',  name:'Johnson & Johnson',sector:'Healthcare',       sleeve:'Defensive',
+    shares:734,  cost:244.88,
+    rec:'WATCH', score:'3.75',
+    bullets:['ERLEADA Phase 3 success + Talvey/Darzalex −72% myeloma progression — pipeline inflecting on multiple fronts',
+             '2.14% dividend yield; post-Kenvue spinoff yields cleaner pharma/MedTech margin profile',
+             'WATCH: near 52-week high at 28.2x P/E — included for Healthcare mandate; talc litigation ongoing'],
+    metrics:[['P/E TTM','28.2x'],['Dividend','2.14%'],['Net Margin','21.8%']]
+  },
+];
+const CASH = 81233;
+const SECTOR_COLORS = {
+  'Financials':       '#3b82f6',
+  'Technology':       '#a855f7',
+  'Consumer Staples': '#10b981',
+  'Healthcare':       '#f59e0b',
+  'Cash':             '#334155',
+};
+
+/* ── Config ──────────────────────────────────────────────────── */
+// Paste your Finnhub API key here before deploying to Netlify.
+// Everyone who opens the link will be automatically connected.
+const HARDCODED_KEY = 'd8vl821r01qgrv4p79i0d8vl821r01qgrv4p79ig';
+
+/* ── State ───────────────────────────────────────────────────── */
+let API_KEY      = '';
+let prices       = {};
+let mktOpen      = false;
+let mktSession   = 'closed';
+let autoInterval = null;
+let cdownSecs    = 0;
+let cdownTimer   = null;
+const REFRESH_SECS = 60;
+const LS_KEY       = 'aeroeq_finnhub_key';
+
+/* ── Boot ────────────────────────────────────────────────────── */
+document.addEventListener('DOMContentLoaded', () => {
+  // 1. Hardcoded key in file (Netlify deploy) — highest priority
+  if (HARDCODED_KEY) {
+    API_KEY = HARDCODED_KEY;
+    document.getElementById('keyBanner').classList.add('hidden');
+    launch();
+    return;
+  }
+  // 2. Previously saved key in localStorage (returning local user)
+  const saved = localStorage.getItem(LS_KEY);
+  if (saved) {
+    API_KEY = saved;
+    document.getElementById('keyBanner').classList.add('hidden');
+    launch();
+    return;
+  }
+  // 3. No key found — show the banner for manual entry
+});
+
+function launch() {
+  startClock();
+  checkMarket().then(() => fetchAll(true));
+  setInterval(checkMarket, 60000);
+}
+
+/* ── Key banner actions ──────────────────────────────────────── */
+function saveKey() {
+  const k = document.getElementById('kb-input').value.trim();
+  const err = document.getElementById('kb-err');
+  if (!k) { err.style.display = 'inline'; return; }
+  err.style.display = 'none';
+  localStorage.setItem(LS_KEY, k);
+  API_KEY = k;
+  document.getElementById('keyBanner').classList.add('hidden');
+  launch();
+}
+
+function changeKey() {
+  const banner = document.getElementById('keyBanner');
+  banner.classList.remove('hidden');
+  document.getElementById('kb-input').value = API_KEY;
+  document.getElementById('kb-input').focus();
+}
+
+/* ── Disclaimer toggle ───────────────────────────────────────── */
+function toggleDisc() {
+  const body = document.getElementById('discBody');
+  const btn  = document.getElementById('discBtn');
+  const open = body.style.display === 'block';
+  body.style.display = open ? 'none' : 'block';
+  btn.innerHTML = 'Disclaimer ' + (open ? '&#9660;' : '&#9650;');
+}
+
+/* ── Clock ───────────────────────────────────────────────────── */
+function startClock() {
+  function tick() {
+    const n = new Date();
+    document.getElementById('clockT').textContent =
+      n.toLocaleTimeString('en-US', {hour12:false,hour:'2-digit',minute:'2-digit',second:'2-digit'});
+    document.getElementById('clockD').textContent =
+      n.toLocaleDateString('en-US', {weekday:'short',month:'short',day:'numeric',year:'numeric'});
+  }
+  tick(); setInterval(tick, 1000);
+}
+
+/* ── Market status ───────────────────────────────────────────── */
+async function checkMarket() {
+  try {
+    const r = await fetch(
+      `https://finnhub.io/api/v1/stock/market-status?exchange=US&token=${API_KEY}`,
+      { signal: AbortSignal.timeout(5000) }
+    );
+    if (!r.ok) throw 0;
+    const d = await r.json();
+    mktOpen    = !!d.isOpen;
+    mktSession = d.isOpen ? 'regular' : inferSession();
+  } catch(_) {
+    // Fallback: infer from ET clock
+    mktSession = inferSession();
+    mktOpen    = mktSession === 'regular';
+  }
+  updateMktBadge();
+  manageAutoRefresh();
+}
+
+function inferSession() {
+  // Convert current time to ET
+  const et   = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }));
+  const day  = et.getDay();                                 // 0=Sun 6=Sat
+  const mins = et.getHours() * 60 + et.getMinutes();
+
+  if (day === 0 || day === 6) return 'closed';
+  if (mins >= 240  && mins <  570) return 'pre-market';    // 4:00–9:30 AM ET
+  if (mins >= 570  && mins <  960) return 'regular';       // 9:30 AM–4:00 PM ET
+  if (mins >= 960  && mins < 1200) return 'after-hours';   // 4:00–8:00 PM ET
+  return 'closed';
+}
+
+function updateMktBadge() {
+  const badge = document.getElementById('mktBadge');
+  const label = document.getElementById('mktLabel');
+  badge.className = 'mkt-badge ' + ({
+    regular:      'open',
+    'pre-market': 'pre',
+    'after-hours':'post',
+    closed:       'closed',
+  }[mktSession] || 'closed');
+
+  label.textContent = {
+    regular:      'MARKET OPEN',
+    'pre-market': 'PRE-MARKET',
+    'after-hours':'AFTER-HOURS',
+    closed:       'MARKET CLOSED',
+  }[mktSession] || 'MARKET CLOSED';
+}
+
+/* ── Auto-refresh ────────────────────────────────────────────── */
+function manageAutoRefresh() {
+  clearInterval(autoInterval);
+  clearInterval(cdownTimer);
+  document.getElementById('countdown').textContent = '';
+
+  if (!mktOpen) return; // No auto-refresh when market is closed
+
+  // Countdown display
+  cdownSecs = REFRESH_SECS;
+  updateCountdown();
+  cdownTimer = setInterval(() => {
+    cdownSecs--;
+    updateCountdown();
+    if (cdownSecs <= 0) {
+      fetchAll(false);
+      cdownSecs = REFRESH_SECS;
+    }
+  }, 1000);
+}
+
+function updateCountdown() {
+  const el = document.getElementById('countdown');
+  el.textContent = mktOpen ? `Auto-refresh in ${cdownSecs}s` : '';
+}
+
+/* ── Finnhub price fetch ─────────────────────────────────────── */
+async function finnhubQuote(ticker) {
+  const r = await fetch(
+    `https://finnhub.io/api/v1/quote?symbol=${ticker}&token=${API_KEY}`,
+    { signal: AbortSignal.timeout(7000) }
+  );
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  const d = await r.json();
+  // c = current price; must be > 0
+  if (!d.c || d.c <= 0) throw new Error('No price returned');
+  return d.c;
+}
+
+async function fetchAll(manual = false) {
+  const btn = document.getElementById('refreshBtn');
+  btn.disabled = true;
+  btn.textContent = '⏳ Fetching…';
+  if (manual) {
+    document.getElementById('tbody').innerHTML =
+      '<tr class="loading-row"><td colspan="11"><span class="spinner"></span>Loading prices from Finnhub…</td></tr>';
+  }
+
+  // Fetch all tickers in parallel
+  await Promise.all(HOLDINGS.map(async h => {
+    try {
+      const p = await finnhubQuote(h.ticker);
+      prices[h.ticker] = { price: p, stale: false };
+    } catch(_) {
+      // Keep previous price if available, mark stale; else fall back to cost
+      prices[h.ticker] = {
+        price: prices[h.ticker]?.price ?? h.cost,
+        stale: true
+      };
+    }
+  }));
+
+  renderTable();
+  renderSummary();
+  renderChart();
+  renderBars();
+
+  document.getElementById('tsVal').textContent = new Date().toLocaleTimeString('en-US', {
+    hour:'2-digit', minute:'2-digit', second:'2-digit', timeZoneName:'short'
+  });
+
+  btn.disabled = false;
+  btn.textContent = '↻ Refresh';
+
+  // Reset countdown after manual refresh
+  if (manual && mktOpen) {
+    clearInterval(cdownTimer);
+    cdownSecs = REFRESH_SECS;
+    updateCountdown();
+    cdownTimer = setInterval(() => {
+      cdownSecs--;
+      updateCountdown();
+      if (cdownSecs <= 0) { fetchAll(false); cdownSecs = REFRESH_SECS; }
+    }, 1000);
+  }
+}
+
+/* ── Helpers ─────────────────────────────────────────────────── */
+const usd    = n => '$' + n.toLocaleString('en-US', {minimumFractionDigits:2,maximumFractionDigits:2});
+const fmtPct = n => (n >= 0 ? '+' : '') + n.toFixed(2) + '%';
+
+/* ── Render table ────────────────────────────────────────────── */
+function renderTable() {
+  // Total portfolio value (equities + cash) for weight calculation
+  const totalNav = HOLDINGS.reduce((sum, h) => {
+    const { price } = prices[h.ticker] || { price: h.cost };
+    return sum + price * h.shares;
+  }, 0) + CASH;
+
+  let html = '';
+  HOLDINGS.forEach((h, i) => {
+    const { price, stale } = prices[h.ticker] || { price: h.cost, stale: true };
+    const mv = price * h.shares, cv = h.cost * h.shares;
+    const rd = mv - cv, rp = rd / cv * 100;
+    const wt = mv / totalNav * 100;
+    const rc  = rd >= 0 ? 'ret-pos' : 'ret-neg';
+    const dot = stale ? 'dot-r' : 'dot-g';
+    const stag = stale ? '<span class="stale-tag">Stale</span>' : '';
+    const slvC = h.sleeve === 'Growth' ? 'slv-g' : 'slv-d';
+    const recC = h.rec === 'BUY' ? 'rec-buy' : 'rec-watch';
+
+    html += `
+    <tr class="data-row" id="row-${i}" onclick="toggleRow(${i})">
+      <td class="l"><span class="td-chev">›</span></td>
+      <td class="l td-ticker">${h.ticker}</td>
+      <td class="l td-name">${h.name}</td>
+      <td class="l"><span class="sec-tag">${h.sector}</span></td>
+      <td class="l"><span class="slv-tag ${slvC}">${h.sleeve}</span></td>
+      <td>${h.shares.toLocaleString()}</td>
+      <td>${usd(h.cost)}</td>
+      <td><div class="price-wrap"><span class="dot ${dot}"></span>${usd(price)} ${stag}</div></td>
+      <td>${usd(mv)}</td>
+      <td style="color:var(--text2);font-weight:600;">${wt.toFixed(1)}%</td>
+      <td class="${rc}">${rd>=0?'+':''}${usd(rd)}</td>
+      <td class="${rc}">${fmtPct(rp)}</td>
+    </tr>
+    <tr class="exp-row" id="exp-${i}">
+      <td colspan="12">
+        <div class="exp-inner">
+          <div>
+            <div class="exp-sl">Rating</div>
+            <span class="rec-badge ${recC}">${h.rec}</span>
+            <span class="score-n"> ${h.score}</span><span class="score-d"> / 5.0</span>
+            ${h.metrics.map(([l,v])=>`<div class="em" style="margin-top:8px"><div class="em-l">${l}</div><div class="em-v">${v}</div></div>`).join('')}
+          </div>
+          <div>
+            <div class="exp-sl">Position Rationale</div>
+            <ul class="exp-bullets">${h.bullets.map(b=>`<li>${b}</li>`).join('')}</ul>
+          </div>
+        </div>
+      </td>
+    </tr>`;
+  });
+  document.getElementById('tbody').innerHTML = html;
+}
+
+function toggleRow(i) {
+  document.getElementById('row-'+i).classList.toggle('open');
+  document.getElementById('exp-'+i).classList.toggle('open');
+}
+
+/* ── Render summary ──────────────────────────────────────────── */
+function renderSummary() {
+  let eqVal = 0, eqCost = 0;
+  for (const h of HOLDINGS) {
+    const { price } = prices[h.ticker] || { price: h.cost };
+    eqVal  += price  * h.shares;
+    eqCost += h.cost * h.shares;
+  }
+  const ret = eqVal - eqCost, rp = ret / eqCost * 100;
+  const rc = ret >= 0 ? 'pos' : 'neg';
+
+  document.getElementById('cTotal').textContent = usd(eqVal + CASH);
+  document.getElementById('cCost').textContent  = usd(eqCost + CASH);
+
+  const cR = document.getElementById('cRet');
+  cR.textContent = (ret>=0?'+':'') + usd(Math.abs(ret));
+  cR.className   = 'card-val ' + rc;
+
+  const cP = document.getElementById('cRetPct');
+  cP.textContent = fmtPct(rp) + ' on equity';
+  cP.className   = 'card-sub ' + rc;
+}
+
+/* ── Render chart (interactive donut) ───────────────────────── */
+let chartSectors = [];
+let hoveredSector = -1;
+
+function renderChart() {
+  const vals = {};
+  for (const h of HOLDINGS) {
+    const { price } = prices[h.ticker] || { price: h.cost };
+    vals[h.sector] = (vals[h.sector]||0) + price * h.shares;
+  }
+  vals['Cash'] = CASH;
+  const total = Object.values(vals).reduce((a,b)=>a+b, 0);
+
+  // Build sectors with start/end angles
+  let angle = -Math.PI/2;
+  chartSectors = Object.entries(vals).map(([name,value]) => {
+    const pct = value/total*100;
+    const sw  = (pct/100)*2*Math.PI;
+    const s   = { name, value, pct, color: SECTOR_COLORS[name]||'#64748b',
+                  startAngle: angle, endAngle: angle+sw };
+    angle += sw;
+    return s;
+  });
+
+  drawDonut(-1); // initial draw, no hover
+
+  // Legend
+  document.getElementById('legend').innerHTML = chartSectors.map((s,i)=>`
+    <div class="leg-row" id="leg-${i}">
+      <div class="leg-l">
+        <span class="leg-sw" style="background:${s.color}"></span>
+        <span class="leg-nm">${s.name}</span>
+        <span class="leg-usd">${usd(s.value)}</span>
+      </div>
+      <span class="leg-pct">${s.pct.toFixed(1)}%</span>
+    </div>`).join('');
+
+  // Attach mouse events once (guard with flag)
+  const cv = document.getElementById('pieCanvas');
+  if (!cv._interactive) {
+    cv._interactive = true;
+    cv.addEventListener('mousemove', onChartMove);
+    cv.addEventListener('mouseleave', () => { hoveredSector=-1; drawDonut(-1); updateLegendHover(-1); });
+  }
+}
+
+function drawDonut(hIdx) {
+  const cv  = document.getElementById('pieCanvas');
+  const ctx = cv.getContext('2d');
+  const cx=146, cy=146, R=116, r=60, BUMP=10;
+  ctx.clearRect(0,0,cv.width,cv.height);
+
+  chartSectors.forEach((s,i) => {
+    const expand = i === hIdx;
+    const ox = expand ? Math.cos((s.startAngle+s.endAngle)/2)*BUMP : 0;
+    const oy = expand ? Math.sin((s.startAngle+s.endAngle)/2)*BUMP : 0;
+
+    ctx.beginPath();
+    ctx.moveTo(cx+ox, cy+oy);
+    ctx.arc(cx+ox, cy+oy, expand ? R+4 : R, s.startAngle, s.endAngle);
+    ctx.closePath();
+    ctx.fillStyle = expand ? lighten(s.color) : s.color;
+    ctx.fill();
+    ctx.strokeStyle='#060e1e'; ctx.lineWidth=2.5; ctx.stroke();
+  });
+
+  // Centre hole
+  ctx.beginPath(); ctx.arc(cx,cy,r,0,2*Math.PI);
+  ctx.fillStyle='#0c1a30'; ctx.fill();
+
+  // Centre text
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  if (hIdx >= 0) {
+    const s = chartSectors[hIdx];
+    ctx.fillStyle=s.color; ctx.font='bold 14px -apple-system,sans-serif';
+    ctx.fillText(s.pct.toFixed(1)+'%', cx, cy-10);
+    ctx.font='10px -apple-system,sans-serif'; ctx.fillStyle='#dce8ff';
+    ctx.fillText(s.name, cx, cy+6);
+    ctx.fillStyle='#6a80a8'; ctx.font='10px -apple-system,sans-serif';
+    ctx.fillText(usd(s.value), cx, cy+20);
+  } else {
+    ctx.fillStyle='#c9a84c'; ctx.font='bold 13px -apple-system,sans-serif';
+    ctx.fillText('AeroEq',cx,cy-8);
+    ctx.font='11px -apple-system,sans-serif'; ctx.fillStyle='#6a80a8';
+    ctx.fillText('Portfolio',cx,cy+9);
+  }
+}
+
+function lighten(hex) {
+  // Blend hex colour with white by ~25%
+  const r=parseInt(hex.slice(1,3),16), g=parseInt(hex.slice(3,5),16), b=parseInt(hex.slice(5,7),16);
+  const lr=Math.round(r+(255-r)*.28), lg=Math.round(g+(255-g)*.28), lb=Math.round(b+(255-b)*.28);
+  return `rgb(${lr},${lg},${lb})`;
+}
+
+function onChartMove(e) {
+  const cv  = document.getElementById('pieCanvas');
+  const rect = cv.getBoundingClientRect();
+  const scaleX = cv.width / rect.width, scaleY = cv.height / rect.height;
+  const mx = (e.clientX - rect.left) * scaleX - 146;
+  const my = (e.clientY - rect.top)  * scaleY - 146;
+  const dist  = Math.sqrt(mx*mx + my*my);
+
+  // Only respond inside the donut ring
+  if (dist < 60 || dist > 130) {
+    if (hoveredSector !== -1) { hoveredSector=-1; drawDonut(-1); updateLegendHover(-1); }
+    return;
+  }
+
+  let angle = Math.atan2(my, mx);
+  // Normalise to match our -π/2 start
+  const norm = a => { while(a < -Math.PI/2) a+=2*Math.PI; return a; };
+  const a = norm(angle);
+
+  const idx = chartSectors.findIndex(s => {
+    const sa=norm(s.startAngle), ea=norm(s.endAngle);
+    return sa <= ea ? (a>=sa && a<ea) : (a>=sa || a<ea);
+  });
+
+  if (idx !== hoveredSector) {
+    hoveredSector = idx;
+    drawDonut(idx);
+    updateLegendHover(idx);
+  }
+}
+
+function updateLegendHover(hIdx) {
+  chartSectors.forEach((_,i) => {
+    const el = document.getElementById('leg-'+i);
+    if (!el) return;
+    el.classList.remove('hi','dim');
+    if (hIdx < 0) return;
+    el.classList.add(i===hIdx ? 'hi' : 'dim');
+  });
+}
+
+/* ── Render return bars ──────────────────────────────────────── */
+function renderBars() {
+  const data = HOLDINGS.map(h => {
+    const { price, stale } = prices[h.ticker] || { price: h.cost, stale: true };
+    const ret  = (price - h.cost) / h.cost * 100;
+    const retD = (price - h.cost) * h.shares;
+    return { h, price, stale, ret, retD };
+  });
+
+  // Detect all-stale situation (all prices == cost, so every ret is 0)
+  const allStale = data.every(d => d.stale);
+  document.getElementById('staleBanner').style.display = allStale ? 'block' : 'none';
+
+  // Normalise bar widths to the largest absolute return (min 1% so bars are always visible)
+  const maxAbs = Math.max(...data.map(d => Math.abs(d.ret)), 1);
+
+  document.getElementById('retBars').innerHTML = data.map(({ h, ret, retD }) => {
+    const pos = ret >= 0;
+    // Minimum 4% bar width so even tiny returns render visibly
+    const w   = ret === 0 ? 0 : Math.max(4, Math.min(100, Math.abs(ret) / maxAbs * 100));
+    const dSign = retD >= 0 ? '+' : '-';
+    return `
+    <div class="rb-card">
+      <div class="rb-tk">${h.ticker}</div>
+      <div class="rb-sc">${h.sector}</div>
+      <div class="rb-track"><div class="rb-fill ${pos?'rb-pos':'rb-neg'}" style="width:${w}%"></div></div>
+      <div class="rb-pct ${pos?'ret-pos':'ret-neg'}">${fmtPct(ret)}</div>
+      <div class="rb-usd">${dSign}${usd(Math.abs(retD))}</div>
+    </div>`;
+  }).join('');
+}
+</script>
+</body>
+</html>
